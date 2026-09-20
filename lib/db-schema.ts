@@ -1,13 +1,12 @@
-export const SCHEMA = `
-CREATE TABLE IF NOT EXISTS users (
+const SCHEMA_STATEMENTS = [
+  `CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   token_hash TEXT UNIQUE NOT NULL,
   token_prefix TEXT NOT NULL,
   name TEXT,
   created_at INTEGER DEFAULT (unixepoch())
-);
-
-CREATE TABLE IF NOT EXISTS collections (
+)`,
+  `CREATE TABLE IF NOT EXISTS collections (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
   slug TEXT UNIQUE NOT NULL,
@@ -18,9 +17,8 @@ CREATE TABLE IF NOT EXISTS collections (
   created_at INTEGER DEFAULT (unixepoch()),
   updated_at INTEGER DEFAULT (unixepoch()),
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS modules (
+)`,
+  `CREATE TABLE IF NOT EXISTS modules (
   id TEXT PRIMARY KEY,
   collection_id TEXT NOT NULL,
   filename TEXT NOT NULL,
@@ -37,13 +35,19 @@ CREATE TABLE IF NOT EXISTS modules (
   created_at INTEGER DEFAULT (unixepoch()),
   updated_at INTEGER DEFAULT (unixepoch()),
   FOREIGN KEY (collection_id) REFERENCES collections(id) ON DELETE CASCADE
-);
+)`,
+  `CREATE INDEX IF NOT EXISTS idx_collections_user_id ON collections(user_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_collections_slug ON collections(slug)`,
+  `CREATE INDEX IF NOT EXISTS idx_modules_collection_id ON modules(collection_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_users_token_prefix ON users(token_prefix)`,
+];
 
-CREATE INDEX IF NOT EXISTS idx_collections_user_id ON collections(user_id);
-CREATE INDEX IF NOT EXISTS idx_collections_slug ON collections(slug);
-CREATE INDEX IF NOT EXISTS idx_modules_collection_id ON modules(collection_id);
-CREATE INDEX IF NOT EXISTS idx_users_token_prefix ON users(token_prefix);
-`;
+// Keep the complete schema for SQLite's multi-statement exec implementation.
+export const SCHEMA = `${SCHEMA_STATEMENTS.join(";\n")};`;
+
+// D1 must receive one complete SQL statement at a time. In particular, do not
+// derive these by splitting SCHEMA: SQL string literals can contain semicolons.
+export const D1_SCHEMA_STATEMENTS = SCHEMA_STATEMENTS;
 
 // Migration for existing databases that lack the required_version column
 export const MIGRATIONS = [
