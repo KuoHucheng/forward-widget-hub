@@ -10,32 +10,35 @@ interface D1PreparedStatement {
 
 interface D1Database {
   prepare(sql: string): D1PreparedStatement;
-  exec(sql: string): Promise<unknown>;
 }
 
 let _initPromise: Promise<void> | null = null;
 
-function isAlreadyExistsError(e: unknown): boolean {
+function isIgnorableSchemaError(e: unknown): boolean {
   const msg = String((e as { message?: string })?.message ?? e);
   return /already exists|duplicate column name/i.test(msg);
 }
 
+async function runSchemaStatement(d1: D1Database, sql: string): Promise<void> {
+  // D1's prepare().run() accepts exactly one complete SQLite statement and
+  // avoids the multi-statement parser used by D1 exec().
+  await d1.prepare(sql).run();
+}
+
 async function ensureSchema(d1: D1Database): Promise<void> {
-  // Execute the pre-defined complete statements. Do not split SCHEMA on
-  // semicolons: doing so can send D1 an incomplete CREATE TABLE statement.
   for (const sql of D1_SCHEMA_STATEMENTS) {
     try {
-      await d1.exec(sql);
+      await runSchemaStatement(d1, sql);
     } catch (e) {
-      if (!isAlreadyExistsError(e)) throw e;
+      if (!isIgnorableSchemaError(e)) throw e;
     }
   }
 
   for (const sql of MIGRATIONS) {
     try {
-      await d1.exec(sql);
+      await runSchemaStatement(d1, sql.replace(/;\s*$/, ""));
     } catch (e) {
-      if (!isAlreadyExistsError(e)) throw e;
+      if (!isIgnorableSchemaError(e)) throw e;
     }
   }
 }
@@ -78,7 +81,7 @@ export function createD1Db(binding: unknown): Db {
     },
     async exec(sql: string): Promise<void> {
       await ready;
-      await d1.exec(sql);
+      await d1.prepare(sql).run();
     },
   };
 }
