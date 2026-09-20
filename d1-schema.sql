@@ -1,3 +1,4 @@
+-- Cloudflare D1 schema. Each statement is complete and can be executed independently.
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   token_hash TEXT UNIQUE NOT NULL,
